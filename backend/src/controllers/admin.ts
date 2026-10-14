@@ -17,7 +17,7 @@ export async function overview(_req: Request, res: Response) {
 export async function listUsers(req: Request, res: Response) {
   const q = String((req.query as Record<string, string>).q ?? '');
   const users = await prisma.user.findMany({
-    where: q ? { OR: [{ email: { contains: q, mode: 'insensitive' } }, { fullName: { contains: q, mode: 'insensitive' } }] } : undefined,
+    where: q ? { OR: [{ email: { contains: q } }, { fullName: { contains: q } }] } : undefined,
     select: { id: true, email: true, fullName: true, status: true, createdAt: true, roles: { include: { role: true } } },
     take: 50,
     orderBy: { createdAt: 'desc' },

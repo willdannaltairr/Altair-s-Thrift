@@ -8,11 +8,13 @@ export async function listProducts(req: Request, res: Response) {
   const p = Math.max(1, Number(page) || 1);
   const l = Math.min(48, Math.max(1, Number(limit) || 12));
   const where: Record<string, unknown> = { status: 'PUBLISHED' };
+  // NOTE: SQLite does not support `mode: 'insensitive'`. Keep plain `contains`
+  // (case-sensitive on SQLite). When migrating to PostgreSQL, re-add mode.
   if (q) {
     (where as Record<string, unknown>).OR = [
-      { name: { contains: String(q), mode: 'insensitive' } },
-      { brand: { contains: String(q), mode: 'insensitive' } },
-      { store: { name: { contains: String(q), mode: 'insensitive' } } },
+      { name: { contains: String(q) } },
+      { brand: { contains: String(q) } },
+      { store: { name: { contains: String(q) } } },
     ];
   }
   if (category) where.category = { slug: String(category) };
@@ -29,8 +31,8 @@ export async function listProducts(req: Request, res: Response) {
   }
   if (size) where.size = String(size);
   if (condition) where.condition = String(condition);
-  if (brand) where.brand = { contains: String(brand), mode: 'insensitive' };
-  if (location) where.store = { ...(where.store as object ?? {}), location: { contains: String(location), mode: 'insensitive' } };
+  if (brand) where.brand = { contains: String(brand) };
+  if (location) where.store = { ...(where.store as object ?? {}), location: { contains: String(location) } };
   if (String(inStock) === 'true') where.stock = { gt: 0 };
 
   const orderBy =
@@ -118,7 +120,8 @@ export async function createProduct(req: Request, res: Response) {
         defects: (rest as { defects?: string }).defects ?? undefined,
         stock,
         status: ((rest as { status?: string }).status as never) ?? 'DRAFT',
-        tags: ((rest as { tags?: string[] }).tags as string[]) ?? [],
+        // SQLite: tags stored as JSON string (see schema). PG migration: back to array.
+        tags: JSON.stringify(((rest as { tags?: string[] }).tags as string[]) ?? []),
       },
     });
     await tx.inventory.create({ data: { productId: p.id, available: stock, reserved: 0, sold: 0 } });
@@ -140,6 +143,9 @@ export async function updateProduct(req: Request, res: Response) {
   if ('error' in check) return fail(res, check.error === 'Forbidden' ? 403 : 404, check.error);
   const { images, stock, ...rest } = req.body as Record<string, never>;
   const data: Record<string, unknown> = { ...rest };
+  if (Array.isArray((rest as { tags?: unknown }).tags)) {
+    data.tags = JSON.stringify((rest as { tags: string[] }).tags);
+  }
   if (stock !== undefined) {
     const s = Number(stock);
     if (s < 0) return fail(res, 400, 'Stock cannot be negative');
