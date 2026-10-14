@@ -1,0 +1,35 @@
+# Altair's Thrift — dependencies
+node_modules/
+dist/
+.next/
+out/
+coverage/
+
+# Build
+*.log
+.turbo/
+
+# Env — never commit real secrets
+.env
+.env.local
+.env*.local
+backend/.env
+frontend/.env.local
+
+# Prisma
+backend/prisma/migrations/migration_lock.toml
+!backend/prisma/migrations/**/migration.sql
+
+# Uploads (local dev only, prod uses S3-compatible)
+uploads/
+backend/uploads/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Temp
+.opencode/
