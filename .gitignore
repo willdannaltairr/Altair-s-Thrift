@@ -20,6 +20,12 @@ frontend/.env.local
 backend/prisma/migrations/migration_lock.toml
 !backend/prisma/migrations/**/migration.sql
 
+# SQLite (local dev)
+*.db
+*.db-journal
+backend/prisma/dev.db
+backend/dev.db
+
 # Uploads (local dev only, prod uses S3-compatible)
 uploads/
 backend/uploads/

@@ -39,7 +39,7 @@ export async function createStore(req: Request, res: Response) {
         description: description as string | undefined,
         location: location as string | undefined,
         contact: contact as string | undefined,
-        socials: (socials as object | undefined) ?? undefined,
+        socials: socials ? JSON.stringify(socials) : undefined,
         category: category as string | undefined,
         theme: (theme as 'MINIMAL' | 'STREETWEAR' | 'CLASSIC' | undefined) ?? 'MINIMAL',
         logoUrl: logoUrl as string | undefined,
@@ -60,7 +60,10 @@ export async function patchStore(req: Request, res: Response) {
   const isOwner = store.ownerId === req.user!.id;
   const isAdmin = req.user!.roles.includes('ADMIN');
   if (!isOwner && !isAdmin) return fail(res, 403, 'Forbidden');
-  const updated = await prisma.store.update({ where: { id }, data: req.body });
+  const body = req.body as Record<string, unknown>;
+  // SQLite stores socials as JSON string
+  if (body.socials && typeof body.socials === 'object') body.socials = JSON.stringify(body.socials);
+  const updated = await prisma.store.update({ where: { id }, data: body as never });
   return ok(res, updated, 'Store updated');
 }
 
