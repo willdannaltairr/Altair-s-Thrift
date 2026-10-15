@@ -77,11 +77,26 @@ export async function getProduct(req: Request, res: Response) {
   return ok(res, { ...product, related });
 }
 
-async function assertOwnership(userId: string, roles: string[], productId: string) {
+import type { Product, Store } from '@prisma/client';
+
+type ProductWithStore = Product & { store: Store };
+
+async function assertOwnership(
+  res: Response,
+  userId: string,
+  roles: string[],
+  productId: string
+): Promise<ProductWithStore | null> {
   const product = await prisma.product.findUnique({ where: { id: productId }, include: { store: true } });
-  if (!product) return { error: 'Product not found' as const };
-  if (product.store.ownerId !== userId && !roles.includes('ADMIN')) return { error: 'Forbidden' as const };
-  return { product };
+  if (!product) {
+    fail(res, 404, 'Product not found');
+    return null;
+  }
+  if (product.store.ownerId !== userId && !roles.includes('ADMIN')) {
+    fail(res, 403, 'Forbidden');
+    return null;
+  }
+  return product;
 }
 
 export async function createProduct(req: Request, res: Response) {
@@ -98,30 +113,31 @@ export async function createProduct(req: Request, res: Response) {
   // ensure unique within store
   const clash = await prisma.product.findUnique({ where: { storeId_slug: { storeId: store.id, slug } } });
   const finalSlug = clash ? `${slug}-${Math.random().toString(36).slice(2, 6)}` : slug;
-  const { images, ...rest } = req.body as Record<string, never>;
-  const stock = Number((rest as { stock?: number }).stock ?? 0);
+  const { images, ...rest } = req.body as Record<string, unknown>;
+  const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
+  const stock = Number((rest.stock as number | string | undefined) ?? 0);
   if (stock < 0) return fail(res, 400, 'Stock cannot be negative');
   const createdProduct = await prisma.$transaction(async (tx) => {
     const p = await tx.product.create({
       data: {
         storeId: store!.id,
-        name: String((rest as { name: string }).name),
+        name: String(rest.name),
         slug: finalSlug,
-        brand: (rest as { brand?: string }).brand ?? undefined,
-        description: (rest as { description?: string }).description ?? undefined,
-        price: Number((rest as { price: number }).price),
-        categoryId: (rest as { categoryId?: string }).categoryId ?? undefined,
-        size: (rest as { size?: string }).size ?? undefined,
-        chestMeasurement: (rest as { chestMeasurement?: string }).chestMeasurement ?? undefined,
-        lengthMeasurement: (rest as { lengthMeasurement?: string }).lengthMeasurement ?? undefined,
-        material: (rest as { material?: string }).material ?? undefined,
-        color: (rest as { color?: string }).color ?? undefined,
-        condition: ((rest as { condition?: string }).condition as never) ?? 'GOOD',
-        defects: (rest as { defects?: string }).defects ?? undefined,
+        brand: str(rest.brand),
+        description: str(rest.description),
+        price: Number(rest.price),
+        categoryId: str(rest.categoryId),
+        size: str(rest.size),
+        chestMeasurement: str(rest.chestMeasurement),
+        lengthMeasurement: str(rest.lengthMeasurement),
+        material: str(rest.material),
+        color: str(rest.color),
+        condition: str(rest.condition) ?? 'GOOD',
+        defects: str(rest.defects),
         stock,
-        status: ((rest as { status?: string }).status as never) ?? 'DRAFT',
+        status: str(rest.status) ?? 'DRAFT',
         // SQLite: tags stored as JSON string (see schema). PG migration: back to array.
-        tags: JSON.stringify(((rest as { tags?: string[] }).tags as string[]) ?? []),
+        tags: JSON.stringify(Array.isArray(rest.tags) ? rest.tags : []),
       },
     });
     await tx.inventory.create({ data: { productId: p.id, available: stock, reserved: 0, sold: 0 } });
@@ -139,12 +155,12 @@ export async function createProduct(req: Request, res: Response) {
 
 export async function updateProduct(req: Request, res: Response) {
   const { id } = req.params;
-  const check = await assertOwnership(req.user!.id, req.user!.roles, id);
-  if ('error' in check) return fail(res, check.error === 'Forbidden' ? 403 : 404, check.error);
-  const { images, stock, ...rest } = req.body as Record<string, never>;
+  const owned = await assertOwnership(res, req.user!.id, req.user!.roles, id);
+  if (!owned) return;
+  const { images, stock, ...rest } = req.body as Record<string, unknown>;
   const data: Record<string, unknown> = { ...rest };
-  if (Array.isArray((rest as { tags?: unknown }).tags)) {
-    data.tags = JSON.stringify((rest as { tags: string[] }).tags);
+  if (Array.isArray(rest.tags)) {
+    data.tags = JSON.stringify(rest.tags);
   }
   if (stock !== undefined) {
     const s = Number(stock);
@@ -177,8 +193,8 @@ export async function updateProduct(req: Request, res: Response) {
 
 export async function archiveProduct(req: Request, res: Response) {
   const { id } = req.params;
-  const check = await assertOwnership(req.user!.id, req.user!.roles, id);
-  if ('error' in check) return fail(res, check.error === 'Forbidden' ? 403 : 404, check.error);
+  const owned = await assertOwnership(res, req.user!.id, req.user!.roles, id);
+  if (!owned) return;
   const p = await prisma.product.update({ where: { id }, data: { status: 'ARCHIVED' } });
   return ok(res, p, 'Product archived');
 }
