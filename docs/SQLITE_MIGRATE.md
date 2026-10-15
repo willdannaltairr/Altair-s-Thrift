@@ -21,13 +21,14 @@ npm run dev
      url      = env("DATABASE_URL")
    }
    ```
-2. Kembalikan `tags` di model `Product`:
-   ```prisma
-   tags String[] @default([])
-   ```
-3. Di `backend/src/controllers/products.ts` (create/update) dan `seed.ts`:
-   ganti `JSON.stringify(tags)` kembali ke array biasa.
-4. Tambahkan lagi `mode: 'insensitive'` pada filter `contains`
+2. Kembalikan `enum` blocks dari git history (`git log -p backend/prisma/schema.prisma`)
+   dan ubah field-field ini kembali:
+   - status/theme/condition/type → tipe `enum` semula
+   - `tags` → `String[] @default([])` (ganti `JSON.stringify(tags)` ke array biasa
+     di `products.ts` dan `seed.ts`)
+   - `socials` / `payload` / `metadata` → `Json?` (ganti `JSON.stringify(...)`
+     ke object biasa di `stores.ts`, `payments.ts`, `admin.ts`)
+3. Tambahkan lagi `mode: 'insensitive'` pada filter `contains`
    di `products.ts` dan `admin.ts` (Postgres mendukung, SQLite tidak).
 5. Set `DATABASE_URL="postgresql://user:pass@host:5432/altairs_thrift"` di `backend/.env`.
 6. Jalankan:

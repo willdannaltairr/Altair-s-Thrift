@@ -14,7 +14,7 @@ export async function createPayment(req: Request, res: Response) {
   if (order.total <= 0) return fail(res, 400, 'Invalid amount');
   const payment = await prisma.payment.upsert({
     where: { orderId },
-    update: { provider: 'sandbox', payload: { method: method ?? 'QRIS_SANDBOX' } },
+    update: { provider: 'sandbox', payload: JSON.stringify({ method: method ?? 'QRIS_SANDBOX' }) },
     create: {
       orderId,
       provider: 'sandbox',
@@ -22,7 +22,7 @@ export async function createPayment(req: Request, res: Response) {
       idempotencyKey: crypto.randomUUID(),
       amount: order.total,
       status: 'PENDING',
-      payload: { method: method ?? 'QRIS_SANDBOX' },
+      payload: JSON.stringify({ method: method ?? 'QRIS_SANDBOX' }),
     },
   });
   // Sandbox checkout URL (frontend polls / simulates). Real gateway would return gateway URL.
