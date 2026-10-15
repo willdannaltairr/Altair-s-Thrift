@@ -17,7 +17,7 @@ export async function overview(_req: Request, res: Response) {
 export async function listUsers(req: Request, res: Response) {
   const q = String((req.query as Record<string, string>).q ?? '');
   const users = await prisma.user.findMany({
-    where: q ? { OR: [{ email: { contains: q, mode: 'insensitive' } }, { fullName: { contains: q, mode: 'insensitive' } }] } : undefined,
+    where: q ? { OR: [{ email: { contains: q } }, { fullName: { contains: q } }] } : undefined,
     select: { id: true, email: true, fullName: true, status: true, createdAt: true, roles: { include: { role: true } } },
     take: 50,
     orderBy: { createdAt: 'desc' },
@@ -54,7 +54,7 @@ export async function verifySeller(req: Request, res: Response) {
     if (status === 'APPROVED' && v.storeId) {
       await tx.store.update({ where: { id: v.storeId }, data: { isVerified: true } });
     }
-    await tx.auditLog.create({ data: { actorId: req.user!.id, action: `seller.${status}`, entity: 'SellerVerification', entityId: id, metadata: { reason } } });
+    await tx.auditLog.create({ data: { actorId: req.user!.id, action: `seller.${status}`, entity: 'SellerVerification', entityId: id, metadata: JSON.stringify({ reason }) } });
     return row;
   });
   return ok(res, updated, `Seller ${status}`);
@@ -75,7 +75,7 @@ export async function moderateProduct(req: Request, res: Response) {
   const { action, reason } = req.body as { action: 'APPROVE' | 'REJECT' | 'ARCHIVE'; reason?: string };
   const status = action === 'APPROVE' ? 'PUBLISHED' : action === 'REJECT' ? 'REJECTED' : 'ARCHIVED';
   const p = await prisma.product.update({ where: { id }, data: { status: status as never } });
-  await prisma.auditLog.create({ data: { actorId: req.user!.id, action: `product.${status}`, entity: 'Product', entityId: id, metadata: { reason } } });
+  await prisma.auditLog.create({ data: { actorId: req.user!.id, action: `product.${status}`, entity: 'Product', entityId: id, metadata: JSON.stringify({ reason }) } });
   return ok(res, p, `Product ${status}`);
 }
 

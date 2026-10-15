@@ -142,7 +142,8 @@ async function main() {
           defects: base.condition === 'GOOD' ? 'Fading ringan, jahitan aman.' : undefined,
           stock: base.stock,
           status: 'PUBLISHED',
-          tags: [base.category, base.brand.toLowerCase(), 'thrift'],
+          // SQLite: tags as JSON string
+          tags: JSON.stringify([base.category, base.brand.toLowerCase(), 'thrift']),
         },
       });
       await prisma.productImage.upsert({
